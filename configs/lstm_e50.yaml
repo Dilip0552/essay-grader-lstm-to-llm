@@ -1,0 +1,14 @@
+# Taghipour & Ng (2016) hyperparameters
+name: lstm_e50
+cnn: false
+vocab_size: 4000
+emb_dim: 50
+cnn_filters: 50
+cnn_window: 3
+hidden: 300
+dropout: 0.5
+lr: 0.001          # RMSprop
+batch_size: 32
+epochs: 50         # as in the paper
+clip_norm: 10.0
+seed: 42

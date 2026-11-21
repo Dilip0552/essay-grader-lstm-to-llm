@@ -1,0 +1,23 @@
+{
+  "fold": 0,
+  "best_dev_qwk": 0.7740110759896148,
+  "test_qwk": 0.7746258606740485,
+  "train_minutes": 21.845501152674355,
+  "test_sec_per_essay": 0.008701841128248724,
+  "device": "Tesla T4",
+  "config": {
+    "name": "deberta_v3_base",
+    "model": "microsoft/deberta-v3-base",
+    "max_len": 512,
+    "head_tokens": 128,
+    "batch_size": 8,
+    "grad_accum": 2,
+    "lr": 2e-05,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "epochs": 3,
+    "dropout": 0.0,
+    "fp16": true,
+    "seed": 42
+  }
+}
