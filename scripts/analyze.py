@@ -23,8 +23,10 @@ MODELS = {
     "length_only_ridge": ("Length only (Ridge)", "#eda100"),
     "features_ridge": ("Features (Ridge)", "#e87ba4"),
     "features_lgbm": ("Features (LightGBM)", "#e87ba4"),
-    "lstm": ("LSTM", "#1baf7a"),
-    "cnn_lstm": ("CNN-LSTM", "#1baf7a"),
+    "lstm": ("LSTM (30 epochs)", "#1baf7a"),
+    "cnn_lstm": ("CNN-LSTM (30 epochs)", "#1baf7a"),
+    "lstm_e50": ("LSTM", "#1baf7a"),
+    "cnn_lstm_e50": ("CNN-LSTM", "#1baf7a"),
     "bert_base": ("BERT-base", "#008300"),
     "deberta_v3_base": ("DeBERTa-v3-base", "#2a78d6"),
     "deberta_v3_base_thr": ("DeBERTa-v3-base + thresholds", "#2a78d6"),
@@ -129,7 +131,7 @@ def _style(ax):
 
 
 def fig_qwk(table: pd.DataFrame):
-    t = table.copy()
+    t = table[[i.startswith("human") or "(5 folds)" in i for i in table.index]].sort_values("Avg", ascending=False)
     t.index = [MODELS.get(i.split(" (")[0], (i,))[0] if not i.startswith("human") else "Human vs human" for i in t.index]
     fig, ax = plt.subplots(figsize=(9, 0.45 * len(t) + 1.2), facecolor=SURFACE)
     im = ax.imshow(t.values, cmap="Blues", vmin=0.3, vmax=0.9, aspect="auto")
@@ -151,7 +153,7 @@ def fig_qwk(table: pd.DataFrame):
 
 def fig_length(models, words):
     """Mean signed error by essay-length quintile (within prompt). Flat at 0 = no length bias."""
-    pick = [m for m in ("length_only_ridge", "features_ridge", "lstm", "deberta_v3_base", "llm_gemini_zero") if m in models]
+    pick = [m for m in ("length_only_ridge", "features_ridge", "lstm_e50" if "lstm_e50" in models else "lstm", "deberta_v3_base", "llm_gemini_zero") if m in models]
     fig, ax = plt.subplots(figsize=(8, 4.5), facecolor=SURFACE)
     _style(ax)
     ax.axhline(0, color=MUTED, lw=1)

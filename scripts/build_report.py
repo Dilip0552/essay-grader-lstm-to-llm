@@ -36,8 +36,8 @@ def values_and_tables():
         v[f"qwk.{key}"] = f"{row.Avg:.3f}"
         for c in q.columns:
             v[f"qwk.{key}.{c}"] = f"{row[c]:.3f}"
-    q.index = [nice(i) + ("" if i.startswith("human") or "(5 folds)" in i else f" ({i.split('(')[1]}" if "(" in i else "")
-               for i in q.index]
+    q = q[[i.startswith("human") or "(5 folds)" in i for i in q.index]].sort_values("Avg", ascending=False)
+    q.index = [nice(i) for i in q.index]  # LLM (subset only) is in Table 2; partial runs are left out
     t["qwk_table"] = "**Table 1. QWK per prompt, averaged over the 5 folds (higher is better).**\n\n" + md_table(q)
 
     f = RESULTS_DIR / "llm_subset_qwk.csv"
@@ -71,12 +71,38 @@ def values_and_tables():
     fe = pd.read_csv(RESULTS_DIR / "feasibility.csv")
     for r in fe.to_dict("records"):
         v[f"sec.{r['model']}"] = f"{r['sec_per_essay']:.4g}"
+        if pd.notna(r.get("train_minutes_total")):
+            v[f"train.{r['model']}"] = f"{r['train_minutes_total']:.0f}"
         if "invalid_answers" in r and pd.notna(r.get("invalid_answers")):
             v[f"invalid.{r['model']}"] = f"{int(r['invalid_answers'])}/{int(r['essays'])}"
     fe.model = fe.model.map(nice)
     t["feasibility_table"] = ("**Table 5. Cost and speed. Times are per essay at prediction time; training time is the "
-                              "total over 5 folds. All runs used free resources.**\n\n" + md_table(fe.fillna("–"), index=False))
+                              "total over 5 folds. All runs used free resources.**\n\n" + md_table(fe.astype(object).fillna("–"), index=False))
+    v.update(extra_values())
     return v, t
+
+
+def extra_values() -> dict:
+    """Derived numbers quoted in the discussion text."""
+    from analyze import available, load, norm_err
+    from aes.metrics import per_prompt_qwk
+
+    v = {}
+    for m in available():
+        v[f"bias.{m}"] = f"{100 * norm_err(load(m)).mean():+.1f}%"  # mean signed error, % of score range
+    q = pd.read_csv(RESULTS_DIR / "qwk_table.csv", index_col=0)
+    human = q.loc[[i for i in q.index if i.startswith("human")][0]]
+    for m in ("deberta_v3_base", "deberta_v3_base_thr"):
+        row = q.loc[[i for i in q.index if i.split(" (")[0] == m][0]]
+        v[f"beats_human.{m}"] = str(int((row.drop("Avg") > human.drop("Avg")).sum()))
+    for short, long in (("lstm", "lstm_e50"), ("cnn_lstm", "cnn_lstm_e50")):
+        a, b = load(short), load(long)
+        if a is not None and b is not None:
+            shared = sorted(set(a.fold) & set(b.fold))
+            qa = per_prompt_qwk(a[a.fold.isin(shared)]).mean()
+            qb = per_prompt_qwk(b[b.fold.isin(shared)]).mean()
+            v[f"e30.{short}"], v[f"e50.{short}"], v[f"efolds.{short}"] = f"{qa:.3f}", f"{qb:.3f}", str(len(shared))
+    return v
 
 
 def fill(template: str, v: dict, t: dict) -> str:
@@ -127,6 +153,11 @@ def main():
     text = fill((REPORTS / "REPORT.template.md").read_text(encoding="utf-8"), v, t)
     (REPORTS / "REPORT.md").write_text(text, encoding="utf-8")
     print("wrote", REPORTS / "REPORT.md")
+    readme = ROOT / "README.md"
+    rd = readme.read_text(encoding="utf-8")
+    start, end = "<!-- results:start -->", "<!-- results:end -->"
+    table = t["qwk_table"].split("\n\n", 1)[1]
+    readme.write_text(rd[:rd.index(start) + len(start)] + "\n" + table + "\n" + rd[rd.index(end):], encoding="utf-8")
     to_pdf(text)
 
 

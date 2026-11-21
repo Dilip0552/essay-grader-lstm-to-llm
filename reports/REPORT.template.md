@@ -50,7 +50,27 @@ We measure how well each one agrees with human teachers. We also ask two practic
 
 ![QWK per prompt](figures/qwk_per_prompt.png)
 
-{{results_discussion}}
+**DeBERTa-v3-base is the best model.** It reaches an average QWK of {{qwk.deberta_v3_base}}, and {{qwk.deberta_v3_base_thr}} with tuned rounding thresholds. That is above the human–human agreement of {{qwk.human}}, and higher than the human row on {{beats_human.deberta_v3_base}} of the 8 prompts.
+
+This comparison is not exactly like-for-like. Models are scored against the *resolved* score, which for prompts 1, 7 and 8 combines both raters. The human row compares one rater with the other. The fair reading is that DeBERTa agrees with the official score about as well as two trained teachers agree with each other. It is weakest on prompts 2, 3 and 8, where humans also disagree most or the essays are longest.
+
+Tuning the rounding thresholds per prompt adds only a little ({{qwk.deberta_v3_base}} → {{qwk.deberta_v3_base_thr}}). The fine-tuned model is already well calibrated.
+
+**Simple features remain a strong baseline.** Ridge regression on 12 features reaches {{qwk.features_ridge}}, in line with the EASE feature system reported by Taghipour & Ng (2016). Word count *alone* gives {{qwk.length_only_ridge}}, and on prompt 1 it scores {{qwk.length_only_ridge.P1}}, above the human raters' {{qwk.human.P1}}.
+
+**Our LSTM falls short of the paper.** We get {{qwk.lstm_e50}} (CNN-LSTM: {{qwk.cnn_lstm_e50}}), against about 0.75 reported in the paper.
+- **Epochs are not the cause.** On the {{efolds.lstm}} folds where both versions finished, QWK was {{e30.lstm}} after 30 epochs and {{e50.lstm}} after 50.
+- **The likely cause is pretrained embeddings.** The paper initialised from pretrained word embeddings; ours start random and learn from only about 1,000 essays per prompt.
+- **Remaining differences:** smaller ones in tokenisation and preprocessing.
+
+We report this gap honestly rather than tuning towards the published number.
+
+**The LLM grader is the weakest learned approach.** We graded the 200-essay subset with Gemini 3.5 Flash-Lite, prompted with the official rubric:
+- **Zero-shot:** QWK {{sub.llm_gemini_zero}}. It is too harsh on average (mean error {{bias.llm_gemini_zero}} of the score range).
+- **Few-shot**, with three scored examples per prompt: {{sub.llm_gemini_few}} (mean error {{bias.llm_gemini_few}}).
+- **DeBERTa on the same essays:** {{sub.deberta_v3_base}}.
+
+The LLM struggles most on prompts 1 and 8, which have the longest essays and the widest score scales. It returned no invalid answers.
 
 ## 5. Do models over-reward length?
 
@@ -70,17 +90,48 @@ We use two tests.
 ![Error by length](figures/length_bias.png)
 ![Stress test](figures/stress_test.png)
 
-{{length_discussion}}
+**Without any intervention, errors do not grow with length for the better models.** In this data, longer essays really do receive higher human scores (correlation {{tcorr}}). So a model that uses length is not wrong *on average*. The feature models and DeBERTa show errors essentially uncorrelated with length ({{lcorr.features_ridge}} and {{lcorr.deberta_v3_base}}).
+
+The LSTM shows a clear negative correlation ({{lcorr.lstm_e50}}). It over-scores short essays and under-scores long ones, which is regression toward the mean, not a reward for length. Zero-shot Gemini behaves similarly ({{lcorr.llm_gemini_zero}}), and few-shot examples remove most of this ({{lcorr.llm_gemini_few}}).
+
+**The stress test tells a different story.** It shows which models can be *gamed*:
+- **Feature models:** appending an irrelevant paragraph raises scores by {{shift.features_ridge.offtopic}} of the score range (Ridge), and {{up.features_ridge.offtopic}} of essays score higher. Length-only Ridge rises {{shift.length_only_ridge.offtopic}}.
+- **DeBERTa:** more robust, but not immune. Off-topic padding raises its scores by {{shift.deberta_v3_base.offtopic}}, with {{up.deberta_v3_base.offtopic}} of essays going up.
+- **DeBERTa, essay pasted twice:** the score barely changes ({{shift.deberta_v3_base.repeat}}). This is partly by construction: head+tail truncation shows the model almost the same text.
+- **LSTM:** moves {{shift.lstm_e50.offtopic}} with off-topic padding.
+
+**Takeaway:** average agreement (QWK) hides how easily a grader can be gamed. A model can match teachers on normal essays and still reward a student for padding. We could not run the stress test for the LLM within the free-tier quota.
 
 ## 6. Classroom feasibility
 
 {{feasibility_table}}
 
-{{feasibility_discussion}}
+- **Accuracy:** DeBERTa is clearly best ({{qwk.deberta_v3_base}}), followed by simple features ({{qwk.features_ridge}}), the LSTM ({{qwk.lstm_e50}}), and the rubric-prompted LLM ({{sub.llm_gemini_few}} few-shot, on the subset).
+- **Cost and speed:**
+  - **Feature models:** train in seconds on a laptop CPU.
+  - **DeBERTa:** needed about {{train.deberta_v3_base}} GPU-minutes to train all 5 folds on a free Kaggle T4. After that it grades an essay in about {{sec.deberta_v3_base}} s.
+  - **LLM:** needs no training data or GPU and answers in about {{sec.llm_gemini_few}} s per essay. But the free tier is tightly rate-limited: one model allowed only 20 requests per day. A paid tier would cost money per essay, and the essays leave the school.
+- **Explainability:**
+  - **Feature models** are transparent, but easy to game.
+  - **The LLM** can justify each score against the rubric in a sentence. That is useful feedback for students, but the justification is not guaranteed to reflect how the score was produced.
+  - **DeBERTa** is a black box.
+- **Data needs:** DeBERTa and the LSTM need hundreds of teacher-scored essays *for the same prompt*. The LLM needs only the rubric, which matters for a teacher writing a new assignment.
 
 ## 7. Recommendation for teachers
 
-{{recommendation}}
+No model here should grade on its own. A safe classroom workflow:
+
+1. **The AI suggests, the teacher decides.** Show the predicted score, plus a rubric-based explanation where available, as a starting point. The teacher confirms or changes every score that counts toward a grade.
+2. **Use a fine-tuned model when teacher-scored essays exist.** If a school has a few hundred scored essays for a recurring prompt, a DeBERTa-style model agrees with the official score about as well as two teachers agree with each other. For new prompts, a rubric-prompted LLM can give first-pass feedback, but its scores are noticeably less reliable.
+3. **Flag essays for closer human review** when:
+   - the model's raw prediction falls between two score points;
+   - two different models (for example DeBERTa and the LLM) disagree by more than one point;
+   - the essay is unusually long or short for the prompt;
+   - the essay contains text that looks off-topic.
+
+   Our stress test shows padding is exactly where models fail.
+4. **Audit regularly.** Have a second teacher re-score a random sample. Check agreement per prompt and per group of students, not just on average.
+5. **Be open with students** that a model assisted, and that length or padding does not earn marks.
 
 ## 8. Limitations and ethics
 
