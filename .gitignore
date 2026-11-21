@@ -1,0 +1,23 @@
+# Data and weights are never committed (see README "Data")
+data/
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+
+# Secrets
+.env
+
+# Tooling
+wandb/
+llm_cache/
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Quick test runs
+reports/results/smoke_*/

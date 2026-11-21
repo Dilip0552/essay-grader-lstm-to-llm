@@ -1,0 +1,13 @@
+name: bert_base
+model: bert-base-uncased
+max_len: 512
+head_tokens: 128      # head+tail truncation: first 128 tokens + last 382 (Sun et al. 2019)
+batch_size: 8
+grad_accum: 2         # effective batch 16
+lr: 2.0e-5
+weight_decay: 0.01
+warmup_ratio: 0.1
+epochs: 3
+dropout: 0.0          # dropout off is standard for regression fine-tuning
+fp16: true
+seed: 42
