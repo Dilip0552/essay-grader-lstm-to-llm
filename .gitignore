@@ -21,3 +21,6 @@ __pycache__/
 
 # Quick test runs
 reports/results/smoke_*/
+
+# Report build intermediate
+reports/REPORT.html

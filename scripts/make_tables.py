@@ -11,6 +11,9 @@ def main():
         files = sorted(d.glob("preds_fold*.csv"))
         if files:
             table[f"{d.name} ({len(files)} folds)"] = per_prompt_qwk(pd.concat(map(pd.read_csv, files)))
+    human = RESULTS_DIR / "human_agreement.csv"  # from scripts/human_agreement.py
+    if human.exists():
+        table["human (rater1 vs rater2)"] = pd.read_csv(human, index_col="prompt").qwk
     if not table:
         print("no predictions found")
         return

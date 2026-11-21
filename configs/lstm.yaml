@@ -1,0 +1,14 @@
+# Taghipour & Ng (2016) hyperparameters
+name: lstm
+cnn: false
+vocab_size: 4000
+emb_dim: 50
+cnn_filters: 50
+cnn_window: 3
+hidden: 300
+dropout: 0.5
+lr: 0.001          # RMSprop
+batch_size: 32
+epochs: 30         # paper: 50; reduced to fit the deadline on a laptop GPU
+clip_norm: 10.0
+seed: 42
