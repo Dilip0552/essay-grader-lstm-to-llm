@@ -118,6 +118,7 @@ def fill(template: str, v: dict, t: dict) -> str:
     missing = set()
 
     def sub(m):
+        """Replacement for one {{key}} match: a table first, then a single value, else a visible marker."""
         key = m.group(1)
         if key in t:
             return t[key]

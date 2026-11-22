@@ -51,6 +51,7 @@ class NeaModel(nn.Module):
     """The paper's architecture: embedding -> optional convolution -> LSTM -> mean over time -> linear -> sigmoid."""
 
     def __init__(self, vocab_size, emb_dim, hidden, cnn_filters, cnn_window, dropout, init_bias):
+        """cnn_filters=0 builds the plain LSTM; init_bias sets the starting output (see train_prompt)."""
         super().__init__()
         self.emb = nn.Embedding(vocab_size, emb_dim, padding_idx=PAD)
         # Optional convolution over neighbouring words (the CNN-LSTM variant); padding keeps the sequence length.
@@ -61,6 +62,7 @@ class NeaModel(nn.Module):
         nn.init.constant_(self.out.bias, init_bias)  # start predicting the mean training score
 
     def forward(self, ids, lengths):
+        """ids: (batch, time) padded token ids; lengths: true essay lengths. Returns one [0, 1] score per essay."""
         x = self.emb(ids)
         if self.cnn is not None:
             x = self.cnn(x.transpose(1, 2)).transpose(1, 2)  # Conv1d expects (batch, channels, time)

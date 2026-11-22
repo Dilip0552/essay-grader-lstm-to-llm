@@ -1,15 +1,16 @@
+# Makes src/aes an installable package ("pip install -e ."), so every script can simply "import aes".
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aes"
+name = "aes"            # automated essay scoring
 version = "0.1.0"
 requires-python = ">=3.10"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src"]         # "src layout": the package lives in src/aes, not at the repository root
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src"]    # lets the tests import aes even without installing the package
 testpaths = ["tests"]

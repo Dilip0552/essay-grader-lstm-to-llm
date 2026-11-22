@@ -14,6 +14,7 @@ class FakeTok:
     cls_token_id, sep_token_id = -1, -2
 
     def __call__(self, texts, add_special_tokens=False):
+        """Each word becomes one token whose id is the word's length, so expected outputs are easy to write."""
         return {"input_ids": [[len(w) for w in t.split()] for t in texts]}
 
 

@@ -1,16 +1,26 @@
+# Python packages for the whole project: pip install -r requirements.txt -e .
+# Only minimum versions are pinned, so the packages preinstalled on Kaggle/Colab (e.g. PyTorch) are reused.
+
+# data handling and evaluation
 numpy>=1.24
 pandas>=2.0
-scikit-learn>=1.3
-pyyaml>=6.0
-python-dotenv>=1.0
+scikit-learn>=1.3      # Ridge regression; also used in tests to cross-check our QWK
+pyyaml>=6.0            # experiment configs in configs/
+python-dotenv>=1.0     # reads the API key from the gitignored .env file
 pytest>=7.0
-tabulate>=0.9
-torch>=2.2
-transformers>=4.40
-sentencepiece>=0.2
-protobuf>=4.0
-lightgbm>=4.0
-textstat>=0.7
-matplotlib>=3.7
-google-genai>=1.0
-markdown>=3.5
+tabulate>=0.9          # pandas -> Markdown tables for the report and README
+
+# neural models
+torch>=2.2             # LSTM and transformer training
+transformers>=4.40     # pretrained BERT / DeBERTa-v3 models and tokenizers
+sentencepiece>=0.2     # needed by the DeBERTa-v3 tokenizer
+protobuf>=4.0          # needed to load the DeBERTa-v3 tokenizer
+
+# feature baseline
+lightgbm>=4.0          # gradient-boosted trees
+textstat>=0.7          # readability formulas (Flesch, Flesch-Kincaid)
+
+# LLM grader, figures and report
+google-genai>=1.0      # Gemini API client
+matplotlib>=3.7        # figures in reports/figures/
+markdown>=3.5          # report Markdown -> HTML -> PDF

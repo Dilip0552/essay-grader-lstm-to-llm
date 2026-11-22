@@ -46,6 +46,7 @@ def encode(texts, prompts, tok, max_len, head):
 def _batches(ids, targets, tok, batch_size, shuffle, seed=0):
     """DataLoader that pads each batch only to its own longest essay (dynamic padding)."""
     def collate(idx):
+        """Turn a list of essay indices into padded input ids, an attention mask and the targets."""
         seqs = [ids[i] for i in idx]
         L = max(map(len, seqs))
         input_ids = torch.full((len(seqs), L), tok.pad_token_id)

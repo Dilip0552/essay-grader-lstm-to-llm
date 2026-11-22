@@ -93,6 +93,7 @@ class Cache:
     """Responses on disk keyed by hash(model + prompt), so reruns cost nothing. Holds essay-derived text: gitignored."""
 
     def __init__(self, model: str):
+        """Load all earlier replies for this model from disk into a dict for instant lookups."""
         CACHE_DIR.mkdir(exist_ok=True)
         # One append-only JSON-lines file per model; the model name is sanitised to be a safe file name.
         self.path = CACHE_DIR / f"{re.sub(r'[^A-Za-z0-9._-]', '_', model)}.jsonl"
@@ -108,6 +109,7 @@ class Cache:
         return hashlib.sha256(f"{self.model}\n{prompt}".encode()).hexdigest()
 
     def get(self, prompt):
+        """The cached reply record for this exact prompt, or None if it was never sent."""
         return self.data.get(self.key(prompt))
 
     def put(self, prompt, rec):
@@ -122,6 +124,7 @@ class GeminiBackend:
     """Gemini API (free tier). Paces calls to stay under the free rate limit and retries on 429s."""
 
     def __init__(self, model: str, min_interval: float = 4.0, thinking_budget=None):
+        """Read the API key from .env and create the client; min_interval = minimum seconds between requests."""
         # Imported here so the rest of the project works without the Gemini SDK installed.
         from dotenv import load_dotenv
         from google import genai
