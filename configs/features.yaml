@@ -1,5 +1,6 @@
+# Feature baselines (run with scripts/train_features.py). One model per prompt, like the classic EASE system.
 seed: 42
 experiments:
-  length_only_ridge: {model: ridge, features: [n_words]}
-  features_ridge: {model: ridge, features: all}
-  features_lgbm: {model: lgbm, features: all}
+  length_only_ridge: {model: ridge, features: [n_words]}   # how much does length alone predict? (bias reference)
+  features_ridge: {model: ridge, features: all}            # linear model on all 12 features
+  features_lgbm: {model: lgbm, features: all}              # non-linear trees on the same features

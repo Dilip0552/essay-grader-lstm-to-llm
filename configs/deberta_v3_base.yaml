@@ -1,13 +1,14 @@
+# Fine-tuning DeBERTa-v3-base for essay scoring (run with scripts/train_transformer.py).
 name: deberta_v3_base
-model: microsoft/deberta-v3-base
-max_len: 512
-head_tokens: 128      # head+tail truncation: first 128 tokens + last 382 (Sun et al. 2019)
-batch_size: 8
-grad_accum: 2         # effective batch 16
-lr: 2.0e-5
-weight_decay: 0.01
-warmup_ratio: 0.1
-epochs: 3
-dropout: 0.0          # dropout off is standard for regression fine-tuning
-fp16: true
+model: microsoft/deberta-v3-base   # strongest "base"-size encoder that fits a free 16 GB T4; large would need ~3x the time
+max_len: 512          # the model's maximum input length in tokens; longer essays are truncated (see head_tokens)
+head_tokens: 128      # head+tail truncation: first 128 tokens + last 382 (Sun et al. 2019) - keeps intro and conclusion
+batch_size: 8         # largest batch that fits 512-token inputs on a T4 in fp16
+grad_accum: 2         # effective batch 16: accumulate 2 batches before each update for more stable gradients
+lr: 2.0e-5            # standard fine-tuning rate for BERT-style models; much higher destroys pretrained knowledge
+weight_decay: 0.01    # mild L2-style regularisation (AdamW default for transformers)
+warmup_ratio: 0.1     # ramp the learning rate up over the first 10% of steps so early updates don't wreck the weights
+epochs: 3             # dev QWK plateaued by epoch 3 in our tests; more epochs cost time and risk overfitting
+dropout: 0.0          # dropout off is standard for regression fine-tuning: it adds noise to a continuous output
+fp16: true            # mixed precision: ~2x faster and half the memory on T4 GPUs
 seed: 42

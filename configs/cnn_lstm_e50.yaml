@@ -1,14 +1,14 @@
-# Taghipour & Ng (2016) hyperparameters
+# Taghipour & Ng (2016) LSTM reproduction (run with scripts/train_lstm.py). All values follow the paper.
 name: cnn_lstm_e50
-cnn: true
-vocab_size: 4000
-emb_dim: 50
-cnn_filters: 50
-cnn_window: 3
-hidden: 300
-dropout: 0.5
-lr: 0.001          # RMSprop
+cnn: true          # true = CNN-LSTM variant: a convolution over neighbouring words before the LSTM
+vocab_size: 4000   # the 4,000 most frequent training words; rarer words become <unk> (limits overfitting on ~1k essays)
+emb_dim: 50        # word-vector size used in the paper
+cnn_filters: 50    # number of convolution filters (only used when cnn: true)
+cnn_window: 3      # each filter looks at 3 consecutive words
+hidden: 300        # LSTM memory size
+dropout: 0.5       # applied before the output layer; strong regularisation because each prompt has little data
+lr: 0.001          # RMSprop learning rate, as in the paper
 batch_size: 32
 epochs: 50         # as in the paper
-clip_norm: 10.0
+clip_norm: 10.0    # gradient clipping: LSTMs on long essays can have exploding gradients
 seed: 42

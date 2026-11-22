@@ -1,0 +1,23 @@
+{
+  "fold": 0,
+  "best_dev_qwk": 0.7443877275426614,
+  "test_qwk": 0.7498790928934371,
+  "train_minutes": 10.917537959416707,
+  "test_sec_per_essay": 0.004225623249732319,
+  "device": "Tesla T4",
+  "config": {
+    "name": "bert_base",
+    "model": "bert-base-uncased",
+    "max_len": 512,
+    "head_tokens": 128,
+    "batch_size": 8,
+    "grad_accum": 2,
+    "lr": 2e-05,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "epochs": 3,
+    "dropout": 0.0,
+    "fp16": true,
+    "seed": 42
+  }
+}

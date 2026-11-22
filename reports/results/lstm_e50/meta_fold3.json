@@ -1,0 +1,63 @@
+{
+  "fold": 3,
+  "prompts": [
+    {
+      "prompt": 1,
+      "best_dev_qwk": 0.5929116582089351,
+      "best_epoch": 12
+    },
+    {
+      "prompt": 2,
+      "best_dev_qwk": 0.5142469470827681,
+      "best_epoch": 26
+    },
+    {
+      "prompt": 3,
+      "best_dev_qwk": 0.5161361757411127,
+      "best_epoch": 26
+    },
+    {
+      "prompt": 4,
+      "best_dev_qwk": 0.6928427974093532,
+      "best_epoch": 14
+    },
+    {
+      "prompt": 5,
+      "best_dev_qwk": 0.8111422972165017,
+      "best_epoch": 22
+    },
+    {
+      "prompt": 6,
+      "best_dev_qwk": 0.6667853328586686,
+      "best_epoch": 38
+    },
+    {
+      "prompt": 7,
+      "best_dev_qwk": 0.6913849862583192,
+      "best_epoch": 26
+    },
+    {
+      "prompt": 8,
+      "best_dev_qwk": 0.593384046045978,
+      "best_epoch": 42
+    }
+  ],
+  "train_minutes": 32.88949159781138,
+  "test_sec_per_essay": 0.0009307487248087628,
+  "device": "NVIDIA GeForce RTX 3050 Laptop GPU",
+  "config": {
+    "name": "lstm_e50",
+    "cnn": false,
+    "vocab_size": 4000,
+    "emb_dim": 50,
+    "cnn_filters": 50,
+    "cnn_window": 3,
+    "hidden": 300,
+    "dropout": 0.5,
+    "lr": 0.001,
+    "batch_size": 32,
+    "epochs": 50,
+    "clip_norm": 10.0,
+    "seed": 42
+  }
+}

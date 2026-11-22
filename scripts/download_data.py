@@ -1,16 +1,20 @@
 """Fetch the nea 5-fold split ids and check that the ASAP TSV is in place.
 
 The ASAP essays themselves come from Kaggle (see README); this script cannot download them for you.
+
+python scripts/download_data.py
 """
 import time
 import urllib.request
 
 from aes.data import FOLDS_DIR, load_asap, load_fold, tsv_path
 
+# Split files published with Taghipour & Ng's code: data/fold_<k>/{train,dev,test}_ids.txt
 NEA = "https://raw.githubusercontent.com/nusnlp/nea/master/data"
 
 
 def fetch(url, dest, tries=4):
+    """Download one file, retrying with exponential back-off (1, 2, 4 s) on network errors."""
     for i in range(tries):
         try:
             with urllib.request.urlopen(url, timeout=30) as r:
@@ -23,6 +27,7 @@ def fetch(url, dest, tries=4):
 
 
 def main():
+    # 1) Fold ids: download only files that are missing or empty, so reruns are instant.
     for k in range(5):
         d = FOLDS_DIR / f"fold_{k}"
         d.mkdir(parents=True, exist_ok=True)
@@ -32,6 +37,7 @@ def main():
                 fetch(f"{NEA}/fold_{k}/{split}_ids.txt", f)
     print(f"folds ready in {FOLDS_DIR}")
 
+    # 2) Sanity check: the essays load and every fold can be built (load_fold raises on mismatched ids).
     if not tsv_path().exists():
         print(f"Missing {tsv_path()}. Download it from Kaggle (README section 'Data'), then rerun.")
         return

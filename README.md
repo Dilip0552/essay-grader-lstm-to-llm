@@ -18,9 +18,12 @@ QWK per prompt, 5-fold average. The full write-up is [reports/REPORT.pdf](report
 | DeBERTa-v3-base + thresholds | 0.813 | 0.702 | 0.705 | 0.818 | 0.811 | 0.831 | 0.822 | 0.701 | 0.775 |
 | DeBERTa-v3-base              | 0.806 | 0.697 | 0.690 | 0.817 | 0.816 | 0.828 | 0.820 | 0.713 | 0.773 |
 | Human vs human               | 0.721 | 0.814 | 0.769 | 0.851 | 0.753 | 0.776 | 0.721 | 0.629 | 0.754 |
+| BERT-base                    | 0.790 | 0.670 | 0.680 | 0.806 | 0.795 | 0.807 | 0.799 | 0.629 | 0.747 |
 | Features (Ridge)             | 0.838 | 0.675 | 0.646 | 0.678 | 0.777 | 0.662 | 0.729 | 0.701 | 0.713 |
 | Features (LightGBM)          | 0.823 | 0.657 | 0.624 | 0.664 | 0.761 | 0.647 | 0.721 | 0.661 | 0.695 |
 | Length only (Ridge)          | 0.755 | 0.531 | 0.623 | 0.635 | 0.754 | 0.591 | 0.603 | 0.401 | 0.612 |
+| LSTM                         | 0.549 | 0.457 | 0.489 | 0.685 | 0.700 | 0.675 | 0.659 | 0.492 | 0.588 |
+| CNN-LSTM                     | 0.507 | 0.431 | 0.483 | 0.664 | 0.638 | 0.627 | 0.633 | 0.475 | 0.557 |
 <!-- results:end -->
 
 ## Setup
@@ -85,9 +88,9 @@ A team project for our Deep Learning course.
 
 | Member | GitHub |
 |---|---|
-| Dilip Suthar (lead) | [@Dilip0552](https://github.com/Dilip0552) |
-| Lakhan Rathore | |
-| Manish Chhaba | |
-| Ashwin Yadav | |
+| Dilip Suthar | [@Dilip0552](https://github.com/Dilip0552) |
+| Lakhan Rathore | [@lakhanrathor](https://github.com/lakhanrathor) |
+| Manish Chhaba | [@Manishchhaba07](https://github.com/Manishchhaba07) |
+| Ashwin Yadav | [@Ajayyadav1234735](https://github.com/Ajayyadav1234735) |
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how to work on the repo.

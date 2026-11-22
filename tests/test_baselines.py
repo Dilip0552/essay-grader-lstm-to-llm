@@ -1,9 +1,11 @@
+"""Tests for the feature extractor, the LSTM tokenizer and the LLM prompt/answer handling."""
 import pytest
 
 from aes.models.features import extract_features
 
 
 def test_features_grow_with_length():
+    """Basic sanity of the counting features."""
     f = extract_features(["The cat sat.", "The cat sat on the mat. Then it slept, happily."])
     assert f.n_words[1] > f.n_words[0]
     assert f.n_sentences.tolist() == [1, 2]
@@ -11,6 +13,7 @@ def test_features_grow_with_length():
 
 
 def test_lstm_tokenizer_matches_nea_conventions():
+    """Lowercasing, @PERSON1 -> @person, numbers -> <num>, and the vocabulary size limit."""
     pytest.importorskip("torch")
     from aes.models.lstm import build_vocab, to_ids, tokenize
 
@@ -21,6 +24,7 @@ def test_lstm_tokenizer_matches_nea_conventions():
 
 
 def test_llm_parser_handles_messy_answers():
+    """LLMs do not always return clean JSON; the parser must recover the score or report it as invalid."""
     from aes.models.llm import parse_score
 
     assert parse_score('{"score": 4, "reason": "ok"}', 1, 6) == 4
@@ -32,6 +36,7 @@ def test_llm_parser_handles_messy_answers():
 
 
 def test_llm_prompt_has_rubric_examples_and_scale():
+    """The prompt must contain the rubric, the examples, the essay, and the single-rater scale."""
     from aes.models.llm import build_prompt
 
     p = build_prompt(8, "RUBRIC TEXT", "my essay", [("ex essay", 20)])

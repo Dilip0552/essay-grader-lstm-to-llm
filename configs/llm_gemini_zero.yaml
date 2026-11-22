@@ -1,7 +1,8 @@
+# Rubric-prompted LLM grader (run with scripts/run_llm.py).
 name: llm_gemini_zero
 backend: gemini
 model: gemini-3.5-flash-lite  # free tier; gemini-2.5-flash allows only 20 requests/day
-shots: 0                   # scored example essays from fold-0 train (low / mid / high)
-per_prompt: 25              # 8 prompts x 25 = 200 essays from fold-0 test
+shots: 0                   # scored example essays from fold-0 train (low / mid / high); 0 = rubric only
+per_prompt: 25              # 8 prompts x 25 = 200 essays from fold-0 test (free-tier quota)
 min_interval: 5.0           # seconds between calls, stays under free-tier requests-per-minute
-seed: 42
+seed: 42                    # same seed = same 200 essays and same examples in every run

@@ -1,0 +1,13 @@
+model,corr_error_length,corr_pred_length,corr_true_length
+length_only_ridge,-0.02,0.931,0.693
+features_ridge,-0.006,0.838,0.693
+features_lgbm,0.003,0.795,0.693
+lstm,-0.293,0.501,0.688
+cnn_lstm,-0.325,0.475,0.688
+lstm_e50,-0.275,0.504,0.693
+cnn_lstm_e50,-0.319,0.469,0.693
+bert_base,-0.033,0.73,0.693
+deberta_v3_base,-0.011,0.742,0.693
+deberta_v3_base_thr,0.113,0.74,0.693
+llm_gemini_zero,-0.169,0.538,0.622
+llm_gemini_few,-0.016,0.603,0.622

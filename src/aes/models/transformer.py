@@ -2,6 +2,16 @@
 
 One model for all 8 prompts. The text is prefixed with its prompt number so the model knows which task it is
 grading; the target is the score scaled to [0, 1] within that prompt's range.
+
+Design choices:
+- Why one model for all prompts (the LSTM uses one per prompt)? A transformer has ~180M parameters and benefits
+  from all ~7,800 training essays at once; per prompt there are only ~1,000. Scaling every score to [0, 1] puts all
+  prompts on one target scale, and the "Prompt k:" prefix tells the model which rubric applies.
+- Why regression (one number, MSE loss) instead of classification? Scores are ordered: predicting 5 for a true 6
+  is better than predicting 1. Regression respects that order, works for every prompt's range with one output,
+  and its continuous output allows threshold tuning (scripts/optimize_thresholds.py).
+- Why keep the best epoch by dev QWK? QWK is the metric we report, and dev is never used for the test numbers,
+  so choosing on dev does not leak test information.
 """
 import json
 import time
@@ -20,6 +30,8 @@ from aes.tracking import RESULTS_DIR, save_predictions
 
 def encode(texts, prompts, tok, max_len, head):
     """Tokenize with head+tail truncation: keep the first `head` tokens and the last ones that still fit."""
+    # Essays longer than the model's window keep their opening (thesis) and closing (conclusion);
+    # the middle is dropped. Sun et al. (2019) found head+tail works better than cutting only the end.
     texts = [f"Prompt {p}: {t}" for t, p in zip(texts, prompts)]
     ids = tok(texts, add_special_tokens=False)["input_ids"]
     room = max_len - 2  # [CLS] ... [SEP], the single-sequence format of both BERT and DeBERTa
@@ -32,40 +44,45 @@ def encode(texts, prompts, tok, max_len, head):
 
 
 def _batches(ids, targets, tok, batch_size, shuffle, seed=0):
+    """DataLoader that pads each batch only to its own longest essay (dynamic padding)."""
     def collate(idx):
         seqs = [ids[i] for i in idx]
         L = max(map(len, seqs))
         input_ids = torch.full((len(seqs), L), tok.pad_token_id)
-        mask = torch.zeros((len(seqs), L), dtype=torch.long)
+        mask = torch.zeros((len(seqs), L), dtype=torch.long)  # 1 = real token, 0 = padding
         for r, s in enumerate(seqs):
             input_ids[r, :len(s)] = torch.tensor(s)
             mask[r, :len(s)] = 1
         return input_ids, mask, torch.tensor(targets[idx], dtype=torch.float)
 
-    g = torch.Generator().manual_seed(seed)
+    g = torch.Generator().manual_seed(seed)  # seeded shuffle, so runs are reproducible
     return DataLoader(np.arange(len(ids)), batch_size=batch_size, shuffle=shuffle, generator=g, collate_fn=collate)
 
 
 @torch.no_grad()
 def predict(model, ids, tok, batch_size, device):
+    """Raw model outputs (scores on the [0, 1] scale, not yet rounded) for every essay, in the original order."""
     model.eval()
     order = np.argsort([len(x) for x in ids])  # length-sorted batches = less padding = faster
     sorted_ids = [ids[i] for i in order]
     out = []
+    # No gradients are needed here, so batches can be twice as large as in training.
     for input_ids, mask, _ in _batches(sorted_ids, np.zeros(len(ids)), tok, batch_size * 2, shuffle=False):
         with torch.autocast(device.type, enabled=device.type == "cuda"):
             out.append(model(input_ids=input_ids.to(device), attention_mask=mask.to(device)).logits.float().squeeze(-1).cpu())
     raw = np.empty(len(ids))
-    raw[order] = torch.cat(out).numpy()
+    raw[order] = torch.cat(out).numpy()  # undo the length sorting
     return raw
 
 
 def _frame(df, fold, raw):
+    """Prediction table in the shared format (see aes.tracking), keeping the unrounded output for threshold tuning."""
     return pd.DataFrame({"essay_id": df.essay_id, "prompt": df.prompt, "fold": fold, "y_true": df.score,
                          "y_pred": from_unit(raw, df.prompt), "y_raw": raw})
 
 
 def train_fold(cfg: dict, fold: int, limit: int | None = None):
+    """Fine-tune on one fold and save dev, test and stress-test predictions plus training history and timing."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data = load_fold(fold)
     if limit:  # smoke tests only
@@ -74,13 +91,16 @@ def train_fold(cfg: dict, fold: int, limit: int | None = None):
     enc = {k: encode(v.essay.tolist(), v.prompt.tolist(), tok, cfg["max_len"], cfg["head_tokens"]) for k, v in data.items()}
     y_train = to_unit(data["train"].score, data["train"].prompt)
 
+    # A pretrained encoder with a fresh single-output regression head.
     model = AutoModelForSequenceClassification.from_pretrained(
         cfg["model"], num_labels=1, hidden_dropout_prob=cfg["dropout"], attention_probs_dropout_prob=cfg["dropout"]
     ).float().to(device)  # fp32 master weights; transformers>=5 keeps the checkpoint's fp16 dtype otherwise
     opt = torch.optim.AdamW(model.parameters(), lr=cfg["lr"], weight_decay=cfg["weight_decay"])
     loader = _batches(enc["train"], y_train, tok, cfg["batch_size"], shuffle=True, seed=cfg["seed"])
+    # Learning rate: linear warm-up, then linear decay to 0 over all optimiser steps.
     steps = len(loader) * cfg["epochs"] // cfg["grad_accum"]
     sched = get_linear_schedule_with_warmup(opt, int(cfg["warmup_ratio"] * steps), steps)
+    # Mixed precision (fp16) on GPU: roughly 2x faster and less memory; the scaler prevents tiny gradients becoming 0.
     scaler = torch.amp.GradScaler(enabled=device.type == "cuda" and cfg["fp16"])
 
     best, best_state, history, t0 = -1.0, None, [], time.time()
@@ -90,10 +110,11 @@ def train_fold(cfg: dict, fold: int, limit: int | None = None):
         for step, (input_ids, mask, y) in enumerate(loader, 1):
             with torch.autocast(device.type, enabled=device.type == "cuda" and cfg["fp16"]):
                 pred = model(input_ids=input_ids.to(device), attention_mask=mask.to(device)).logits.squeeze(-1)
+            # Gradient accumulation: average the loss over grad_accum batches to simulate a larger batch.
             loss = torch.nn.functional.mse_loss(pred.float(), y.to(device)) / cfg["grad_accum"]
             scaler.scale(loss).backward()
             if step % cfg["grad_accum"] == 0 or step == len(loader):
-                scaler.unscale_(opt)
+                scaler.unscale_(opt)  # clip real gradient values, not the fp16-scaled ones
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 scaler.step(opt)
                 scaler.update()
@@ -104,22 +125,26 @@ def train_fold(cfg: dict, fold: int, limit: int | None = None):
         history.append({"epoch": epoch, "train_loss": float(np.mean(losses)), "dev_qwk": dev_qwk,
                         "minutes": (time.time() - t0) / 60})
         print(history[-1])
+        # Keep a CPU copy of the best epoch's weights (by dev QWK); model weights are never written to disk.
         if dev_qwk > best:
             best, best_state = dev_qwk, {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
     model.load_state_dict(best_state)
     name = cfg["name"]
+    # Dev predictions are saved too: scripts/optimize_thresholds.py tunes rounding cut-points on them.
     save_predictions(_frame(data["dev"], fold, predict(model, enc["dev"], tok, cfg["batch_size"], device)), name, fold, "dev")
     t1 = time.time()
     scores = save_predictions(_frame(data["test"], fold, predict(model, enc["test"], tok, cfg["batch_size"], device)),
                               name, fold)
-    sec_per_essay = (time.time() - t1) / len(data["test"])
+    sec_per_essay = (time.time() - t1) / len(data["test"])  # inference speed, for the feasibility table
 
+    # Length-bias stress test: re-score the test essays after making them longer but not better.
     test = data["test"]
     for variant, texts in stress_variants(test.essay.tolist()).items():
         ids = encode(texts, test.prompt.tolist(), tok, cfg["max_len"], cfg["head_tokens"])
         save_predictions(_frame(test, fold, predict(model, ids, tok, cfg["batch_size"], device)), name, fold, f"stress_{variant}")
 
+    # Per-epoch learning curve and run metadata (timing, GPU, config) for the report.
     out = RESULTS_DIR / name
     pd.DataFrame(history).to_csv(out / f"history_fold{fold}.csv", index=False)
     meta = {"fold": fold, "best_dev_qwk": best, "test_qwk": scores.mean(), "train_minutes": history[-1]["minutes"],

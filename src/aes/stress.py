@@ -1,4 +1,8 @@
-"""Length-bias stress test: make essays longer without making them better, and see if the score goes up."""
+"""Length-bias stress test: make essays longer without making them better, and see if the score goes up.
+
+A fair grader should give the same (or a lower) score to a padded essay. Every training script re-scores its test
+essays with these variants and saves the results as stress_<variant>_preds_fold*.csv.
+"""
 
 # Our own neutral, off-topic filler (~110 words). It does not answer any ASAP prompt.
 OFFTOPIC = (

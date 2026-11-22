@@ -1,4 +1,7 @@
-"""Build the results table (QWK per model x prompt) from reports/results/*/preds_fold*.csv."""
+"""Build the results table (QWK per model x prompt) from reports/results/*/preds_fold*.csv.
+
+python scripts/make_tables.py   ->  reports/results/qwk_table.csv and qwk_table.md
+"""
 import pandas as pd
 
 from aes.metrics import per_prompt_qwk
@@ -7,9 +10,11 @@ from aes.tracking import RESULTS_DIR
 
 def main():
     table = {}
+    # One row per experiment folder; smoke-test folders (quick local checks) are skipped.
     for d in sorted(p for p in RESULTS_DIR.glob("*") if p.is_dir() and not p.name.startswith("smoke_")):
         files = sorted(d.glob("preds_fold*.csv"))
         if files:
+            # The fold count is kept in the row name so partial runs are never mistaken for complete ones.
             table[f"{d.name} ({len(files)} folds)"] = per_prompt_qwk(pd.concat(map(pd.read_csv, files)))
     human = RESULTS_DIR / "human_agreement.csv"  # from scripts/human_agreement.py
     if human.exists():
@@ -19,7 +24,7 @@ def main():
         return
     t = pd.DataFrame(table).T
     t.columns = [f"P{c}" for c in t.columns]
-    t["Avg"] = t.mean(axis=1)
+    t["Avg"] = t.mean(axis=1)  # unweighted mean over the 8 prompts, as in the paper
     t = t.round(3).sort_values("Avg")
     t.to_csv(RESULTS_DIR / "qwk_table.csv")
     (RESULTS_DIR / "qwk_table.md").write_text(t.to_markdown())
