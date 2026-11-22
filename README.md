@@ -82,9 +82,9 @@ tests/          pytest
 
 **Rule:** every experiment saves `reports/results/<experiment>/preds_fold{k}.csv` (columns `essay_id, prompt, fold, y_true, y_pred`) through `aes.tracking.save_predictions`. Tables and plots are built only from these files.
 
-## Team
+## Team 30
 
-A team project for our Deep Learning course.
+A team project for our Deep Learning course at Sitare University.
 
 | Member | GitHub |
 |---|---|
