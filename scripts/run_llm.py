@@ -7,6 +7,7 @@ report), which keeps the comparison fair.
 python scripts/run_llm.py --config configs/llm_gemini_zero.yaml
 python scripts/run_llm.py --config configs/llm_gemini_few.yaml
 python scripts/run_llm.py --config configs/llm_gemini_zero.yaml --limit 2   # quick check: 2 essays per prompt
+python scripts/run_llm.py --config configs/llm_gemini_zero.yaml --stress 6  # length stress test on 6 essays per prompt
 """
 import argparse
 
@@ -15,6 +16,7 @@ import pandas as pd
 
 from aes.data import PROMPTS, SCORE_RANGES, load_fold
 from aes.models.llm import LLM_SCALE, Cache, GeminiBackend, build_prompt, load_rubrics, parse_score
+from aes.stress import stress_variants
 from aes.tracking import RESULTS_DIR, save_predictions
 from aes.utils import load_config
 
@@ -43,6 +45,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--limit", type=int, help="essays per prompt (overrides config) for a quick check")
+    # Re-grading padded essays costs extra API calls, so the stress test uses a smaller subset (the first N of each
+    # prompt's 25 essays). The unpadded scores for those essays come from the cache, so they cost nothing.
+    ap.add_argument("--stress", type=int, help="run the length stress test on N essays per prompt")
     args = ap.parse_args()
     cfg = load_config(args.config)
     name = cfg["name"] if not args.limit else f"smoke_{cfg['name']}"
@@ -57,38 +62,50 @@ def main():
     # least-harmful guess, and the essay is still counted as "invalid" in the log so the failure stays visible.
     fallback = data["train"].groupby("prompt").score.median().round().astype(int)
 
-    rows = []
-    for i, e in enumerate(essays.itertuples(), 1):
-        lo, hi, mult = LLM_SCALE[e.prompt]
-        prompt = build_prompt(e.prompt, rubrics[e.prompt], e.essay, shots.get(e.prompt, ()))
-        rec, tries = None, 0
-        for tries in (1, 2):  # one retry on an invalid answer, with the cache bypassed
-            # Cache first: a rerun after a crash or quota stop costs no API calls for essays already graded.
-            hit = cache.get(prompt) if tries == 1 else None
-            if hit is None:
-                # The retry adds a stricter instruction; it is not cached, so the original prompt keeps its answer.
-                text, info = backend.generate(prompt if tries == 1 else prompt + "\n\nReply with the JSON object only.")
-                hit = {"text": text, **info, "cached": False}
-                if tries == 1:
-                    cache.put(prompt, hit)
-            else:
-                hit = {**hit, "cached": True}
-            rec = hit
-            if parse_score(rec["text"], lo, hi) is not None:
-                break
-        raw = parse_score(rec["text"], lo, hi)
-        lo_f, hi_f = SCORE_RANGES[e.prompt]
-        # Convert one rater's score to the final scale (x2 for prompts 1, 7, 8) and clip to the official range.
-        pred = fallback[e.prompt] if raw is None else int(np.clip(raw * mult, lo_f, hi_f))
-        rows.append({"essay_id": e.essay_id, "prompt": e.prompt, "fold": 0, "y_true": e.score, "y_pred": pred,
-                     "llm_raw_score": raw, "invalid": raw is None, "tries": tries, "cached": rec["cached"],
-                     "latency_s": rec.get("latency_s"), "input_tokens": rec.get("input_tokens"),
-                     "output_tokens": rec.get("output_tokens")})
-        print(f"{i}/{len(essays)} prompt {e.prompt}: true {e.score} pred {pred}{' (invalid)' if raw is None else ''}")
+    def grade(df, texts):
+        """Grade each essay text (the original or a padded version); one result row per essay."""
+        rows = []
+        for i, (e, text) in enumerate(zip(df.itertuples(), texts), 1):
+            lo, hi, mult = LLM_SCALE[e.prompt]
+            prompt = build_prompt(e.prompt, rubrics[e.prompt], text, shots.get(e.prompt, ()))
+            rec, tries = None, 0
+            for tries in (1, 2):  # one retry on an invalid answer, with the cache bypassed
+                # Cache first: a rerun after a crash or quota stop costs no API calls for essays already graded.
+                hit = cache.get(prompt) if tries == 1 else None
+                if hit is None:
+                    # The retry adds a stricter instruction; it is not cached, so the original prompt keeps its answer.
+                    reply, info = backend.generate(prompt if tries == 1 else prompt + "\n\nReply with the JSON object only.")
+                    hit = {"text": reply, **info, "cached": False}
+                    if tries == 1:
+                        cache.put(prompt, hit)
+                else:
+                    hit = {**hit, "cached": True}
+                rec = hit
+                if parse_score(rec["text"], lo, hi) is not None:
+                    break
+            raw = parse_score(rec["text"], lo, hi)
+            lo_f, hi_f = SCORE_RANGES[e.prompt]
+            # Convert one rater's score to the final scale (x2 for prompts 1, 7, 8) and clip to the official range.
+            pred = fallback[e.prompt] if raw is None else int(np.clip(raw * mult, lo_f, hi_f))
+            rows.append({"essay_id": e.essay_id, "prompt": e.prompt, "fold": 0, "y_true": e.score, "y_pred": pred,
+                         "llm_raw_score": raw, "invalid": raw is None, "tries": tries, "cached": rec["cached"],
+                         "latency_s": rec.get("latency_s"), "input_tokens": rec.get("input_tokens"),
+                         "output_tokens": rec.get("output_tokens")})
+            print(f"{i}/{len(df)} prompt {e.prompt}: true {e.score} pred {pred}{' (invalid)' if raw is None else ''}")
+        return pd.DataFrame(rows)
+
+    if args.stress:
+        # Stress test: same essays, made longer but not better (see aes.stress). Saved next to the normal
+        # predictions as stress_<variant>_preds_fold0.csv, which scripts/analyze.py compares essay by essay.
+        part = essays.groupby("prompt").head(args.stress).reset_index(drop=True)
+        for variant, texts in stress_variants(part.essay.tolist()).items():
+            save_predictions(grade(part, texts), name, 0, f"stress_{variant}")
+        return
+
+    log = grade(essays, essays.essay.tolist())
 
     # The log is committed, so it holds no essay text and no model explanations: those may quote the essay,
     # and the ASAP rules forbid sharing essays. Explanations stay in the gitignored cache.
-    log = pd.DataFrame(rows)
     save_predictions(log, name, 0)
     log.to_csv(RESULTS_DIR / name / "llm_log.csv", index=False)
     fresh = log[~log.cached]  # cached answers took ~0 s, so latency is measured on fresh calls only

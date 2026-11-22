@@ -5,6 +5,7 @@ python scripts/make_tables.py   ->  reports/results/qwk_table.csv and qwk_table.
 import pandas as pd
 
 from aes.metrics import per_prompt_qwk
+from aes.data import ROOT
 from aes.tracking import RESULTS_DIR
 
 
@@ -29,6 +30,31 @@ def main():
     t.to_csv(RESULTS_DIR / "qwk_table.csv")
     (RESULTS_DIR / "qwk_table.md").write_text(t.to_markdown())
     print(t.to_string())
+    update_readme(t)
+
+
+def update_readme(t: pd.DataFrame):
+    """Replace the README's results table with the current numbers, so the README is never out of date.
+
+    Only models evaluated on all 5 folds (plus the human row) are shown: partial runs and the LLM, which graded a
+    200-essay subset, are not comparable with 5-fold averages.
+    """
+    readme = ROOT / "README.md"
+    start, end = "<!-- results:start -->", "<!-- results:end -->"
+    text = readme.read_text(encoding="utf-8")
+    if start not in text:
+        return
+    full = t[[i.startswith("human") or "(5 folds)" in i for i in t.index]].sort_values("Avg", ascending=False)
+    full.index = [nice_name(i) for i in full.index]
+    table = full.to_markdown(floatfmt=".3f")
+    readme.write_text(text[:text.index(start) + len(start)] + "\n" + table + "\n" + text[text.index(end):], encoding="utf-8")
+
+
+def nice_name(row: str) -> str:
+    """'deberta_v3_base (5 folds)' -> 'DeBERTa-v3-base', using the display names defined in analyze.py."""
+    from analyze import MODELS  # imported here: analyze.py loads matplotlib, which make_tables otherwise does not need
+    base = row.split(" (")[0]
+    return "Human vs human" if base.startswith("human") else MODELS.get(base, (base,))[0]
 
 
 if __name__ == "__main__":

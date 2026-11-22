@@ -17,3 +17,5 @@ bert_base,offtopic,21.34,82.0,0.2
 bert_base,repeat,2.74,27.2,11.0
 deberta_v3_base,offtopic,10.75,54.9,1.4
 deberta_v3_base,repeat,-2.78,15.1,20.7
+llm_gemini_zero,offtopic,-10.31,0.0,50.0
+llm_gemini_zero,repeat,-4.37,8.3,29.2

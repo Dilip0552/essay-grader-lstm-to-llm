@@ -26,8 +26,8 @@ MODELS = {
     "length_only_ridge": ("Length only (Ridge)", "#eda100"),
     "features_ridge": ("Features (Ridge)", "#e87ba4"),
     "features_lgbm": ("Features (LightGBM)", "#e87ba4"),
-    "lstm": ("LSTM (30 epochs)", "#1baf7a"),
-    "cnn_lstm": ("CNN-LSTM (30 epochs)", "#1baf7a"),
+    "lstm": ("LSTM (30 epochs, 2 folds)", "#1baf7a"),
+    "cnn_lstm": ("CNN-LSTM (30 epochs, 2 folds)", "#1baf7a"),
     "lstm_e50": ("LSTM", "#1baf7a"),
     "cnn_lstm_e50": ("CNN-LSTM", "#1baf7a"),
     "bert_base": ("BERT-base", "#008300"),
@@ -173,6 +173,7 @@ def fig_qwk(table: pd.DataFrame):
     fig.colorbar(im, ax=ax, fraction=0.025)
     fig.tight_layout()
     fig.savefig(FIG_DIR / "qwk_per_prompt.png", dpi=200)
+    fig.savefig(FIG_DIR / "qwk_per_prompt.pdf")  # vector copy for the LaTeX report: sharp at any zoom
     plt.close(fig)
 
 
@@ -199,6 +200,7 @@ def fig_length(models, words):
     ax.grid(axis="y", color="#e4e3df", lw=0.8)
     fig.tight_layout()
     fig.savefig(FIG_DIR / "length_bias.png", dpi=200)
+    fig.savefig(FIG_DIR / "length_bias.pdf")  # vector copy for the LaTeX report: sharp at any zoom
     plt.close(fig)
 
 
@@ -207,7 +209,8 @@ def fig_stress(stress: pd.DataFrame):
     if stress.empty:
         return
     p = stress.pivot(index="model", columns="variant", values="mean_shift_pct_of_range")
-    p = p.loc[[m for m in MODELS if m in p.index]]  # same model order as everywhere else
+    # Same model order as everywhere else; the 2-fold 30-epoch LSTM runs are left out (side comparison only).
+    p = p.loc[[m for m in MODELS if m in p.index and m not in ("lstm", "cnn_lstm")]]
     labels = {"offtopic": ("+ off-topic paragraph", "#2a78d6"), "repeat": ("essay pasted twice", "#eb6834")}
     fig, ax = plt.subplots(figsize=(8, 0.6 * len(p) + 1.5), facecolor=SURFACE)
     _style(ax)
@@ -220,13 +223,17 @@ def fig_stress(stress: pd.DataFrame):
             # Value label at the end of each bar, on the outside, whichever direction the bar points.
             ax.text(val, yi, f" {val:+.1f}" if val >= 0 else f"{val:+.1f} ", va="center",
                     ha="left" if val >= 0 else "right", fontsize=8, color=INK)
-    ax.set_yticks(range(len(p)), [MODELS[m][0] for m in p.index])
+    # The LLM was re-graded on a small subset only, so its label says how many essays.
+    n_llm = {m: len(load(m, "stress_offtopic_preds")) for m in p.index if m.startswith("llm_")}
+    ax.set_yticks(range(len(p)), [MODELS[m][0] + (f" ({n_llm[m]} essays)" if m in n_llm else "") for m in p.index])
     ax.invert_yaxis()  # first model at the top
     ax.set_xlabel("mean score change (% of score range)", color=MUTED)
-    ax.set_title("Stress test: does a longer (not better) essay score higher?", loc="left", color=INK)
+    ax.margins(x=0.12)  # room for the value labels at both ends of the bars
+    ax.set_title("Stress test: does a longer, not better, essay score higher?", loc="left", color=INK, fontsize=11)
     ax.legend(frameon=False, loc="lower right")
     fig.tight_layout()
     fig.savefig(FIG_DIR / "stress_test.png", dpi=200)
+    fig.savefig(FIG_DIR / "stress_test.pdf")  # vector copy for the LaTeX report: sharp at any zoom
     plt.close(fig)
 
 

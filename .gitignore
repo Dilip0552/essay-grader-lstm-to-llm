@@ -24,3 +24,8 @@ reports/results/smoke_*/
 
 # Report build intermediate
 reports/REPORT.html
+
+# Report (submitted separately as a PDF, not part of the repo)
+reports/REPORT*
+reports/overleaf*
+scripts/build_report.py
